@@ -1,0 +1,97 @@
+import numpy as np
+import scipy as sp
+import matplotlib.pyplot as plt
+
+E = 150
+r = 0.02
+sigma = 0.15 
+S = 100
+M = 3 
+T = 90/365
+t = 0
+
+tau = (1/2)*(sigma**2)*(T-t)
+
+k = r/((1/2)*sigma**2)
+alpha = -(1/2)*(k-1)
+beta = -(1/4)*(k+1)**2
+gamma_1 = (1/2)*(k+1)
+gamma_2 = (1/2)*(k-1)
+zeta_1 = gamma_1**2
+zeta_2 = gamma_2**2
+
+S_0 = S
+x_0 = np.log(S_0/E)
+S_L = min(S_0,E)*np.exp(-M*sigma*np.sqrt(T))
+#S_L = S_0*np.exp(-M*sigma*np.sqrt(T))
+S_U = max(S_0,E)*np.exp(M*sigma*np.sqrt(T))
+x_L = np.log(S_L/E)
+x_U = np.log(S_U/E)
+l = x_U - x_L
+y_0 = -x_L
+x=np.linspace(x_L,x_U,10000)
+y = x-x_L
+
+N= 1000
+
+bs = []
+c_zeros =[]
+u_zeros = []
+cs =[]
+us = []
+u = []
+
+for n in range(1,N+1):
+    u_cont = lambda xx: (np.exp((gamma_1)*xx)-np.exp((gamma_2)*xx))* np.sin((n*np.pi*(xx-x_L))/l)
+    b_n = (2/l)*sp.integrate.quad(u_cont,0,x_U)[0]
+    bs.append(b_n)
+    #u_n = b_n*np.sin((n*np.pi*y)/l)
+    g_R_zero = np.exp(gamma_1*x_U)-np.exp(gamma_2*x_U)
+    c_zero = b_n + 2*((-1)**n)/(n*np.pi)*g_R_zero
+    c_zeros.append(c_zero)
+    u_n_zero = c_zero*np.sin((n*np.pi*y)/l)
+    u_zeros.append(u_n_zero)
+    D_n = lambda lam, tau: (np.exp(lam*tau)-np.exp(-(n*np.pi/l)**2*tau))/(lam+(n*np.pi/l)**2)
+    c_n = lambda tau: c_zero*np.exp(-(n*np.pi/l)**2*tau)+ (2*(-1)**n)/(n*np.pi)*(zeta_1*np.exp((gamma_1*x_U))*D_n(zeta_1,tau)-zeta_2*np.exp((gamma_2*x_U))*D_n(zeta_2,tau))
+    g_R_tau = lambda tau: np.exp(gamma_1*x_U+zeta_1*tau)-np.exp(gamma_2*x_U+zeta_2*tau)
+    u_n = c_n(tau)*np.sin((n*np.pi*y)/l)
+    us.append(u_n)
+    print(b_n)
+    print(u_n)
+
+#u = np.sum(us, axis=0)
+
+#u = (y/l)*g_R_zero + np.sum(us, axis=0)
+u = (y/l)*g_R_tau(tau) + np.sum(us, axis=0)
+V = E*np.exp(alpha*x)*u
+V_price = E*np.exp((alpha*x)+(beta*tau))*u
+
+S_grid = E*np.exp(x)
+
+d1 = (np.log(S_grid/E) + (r + sigma**2/2)*(T-t)) / (sigma*np.sqrt(T-t))
+d2 = d1 - sigma*np.sqrt(T-t)
+BS = S_grid*sp.stats.norm.cdf(d1) - E*np.exp(-r*(T-t))*sp.stats.norm.cdf(d2)
+
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 12))
+ax1.plot(S_grid, V_price, label='Fourier Series Approximation', linestyle='-', color='blue')
+ax1.plot(S_grid, BS, label='Black-Scholes', linestyle='--', color='orange')
+ax1.plot(S_grid, np.maximum(S_grid-E,0), label='Payoff', linestyle='-.', color='green')
+ax1.set_title('Option Price Comparison')
+ax1.set_xlabel('Stock Price (S)')
+ax1.set_ylabel('Option Price')
+ax1.legend()
+ax2.plot(S_grid, V_price-BS, label='Difference (Approx - BS)')
+ax2.set_title('Difference between Fourier Series Approximation and Black-Scholes')
+ax2.set_xlabel('Stock Price (S)')
+ax2.set_ylabel('Difference')
+ax2.legend()
+"""
+ax3.plot(S_grid, np.maximum(S_grid-E,0), label='Payoff')
+ax3.set_title('Option Payoff')
+ax3.set_xlabel('Stock Price (S)')
+ax3.set_ylabel('Payoff')
+ax3.legend()
+#ax3.plot(S_grid, u)
+"""
+plt.tight_layout()
+plt.show()
